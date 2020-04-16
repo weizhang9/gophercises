@@ -12,7 +12,7 @@ import (
 
 func main() {
 	filename := flag.String("csv", "problems", "input csv file name")
-	// t := flag.Int("timer", 30, "time allowed for the quiz before it terminated")
+	t := flag.Int("timer", 30, "time allowed for the quiz before it terminated")
 	flag.Parse()
 	count := 0
 	csvFile, err := os.Open(fmt.Sprintf("%v.csv", *filename))
@@ -26,8 +26,8 @@ func main() {
 	}
 	
 	for _, line := range data {
-		timer := time.AfterFunc(time.Second * 3, func() {
-			fmt.Printf("Got %v out of %v correct\n", count, len(data))
+		timer := time.AfterFunc(time.Second * time.Duration(*t), func() {
+			fmt.Printf("\nGot %v out of %v correct\n", count, len(data))
 			os.Exit(0)
 		})
 		defer timer.Stop()
