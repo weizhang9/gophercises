@@ -5,58 +5,69 @@ import (
 	"encoding/csv"
 	"flag"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 	"time"
 )
 
 func main() {
 	filename := flag.String("csv", "problems", "input csv file name")
-	// t := flag.Int("timer", 30, "time allowed for the quiz before it terminated")
+	timeLimit := flag.Int("limit", 30, "time allowed for the quiz before it terminated")
 	flag.Parse()
-	count := 0
 	csvFile, err := os.Open(fmt.Sprintf("%v.csv", *filename))
 	if err != nil {
-		log.Fatalln(err)
+		exit(fmt.Sprintf("%v, %v\n", err, csvFile))
 	}
 	reader := csv.NewReader(bufio.NewReader(csvFile))
 	data, err := reader.ReadAll()
 	if err != nil {
-		log.Fatalln(err)
+		exit(fmt.Sprintln(err))
 	}
-	
-	for _, line := range data {
-		timer := time.AfterFunc(time.Second * 3, func() {
-			fmt.Printf("Got %v out of %v correct\n", count, len(data))
-			os.Exit(0)
-		})
-		defer timer.Stop()
-		fmt.Print(line[0], " = ? ")
-		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Scan()
-		answer := scanner.Text()
-		
-		if answer == line[1] {
-			count++
+
+	aCh := make(chan string)
+	go func() {
+		var answer string
+		fmt.Scanf("%s\n", &answer)
+		aCh <- answer
+	}()
+	correct := 0
+	quizs := parseQuiz(data)
+	timer := time.NewTimer(time.Duration(*timeLimit) * time.Second)
+
+	quizLoop:
+	for i, q := range quizs {
+		fmt.Printf("Quiz #%d: %s = ?\n", i+1, q.q)
+		select {
+		case <-timer.C:
+			break quizLoop
+		case answer := <- aCh:	
+			if answer == q.a {
+				correct++
+			}
 		}
 	}
 	
-	fmt.Printf("Got %v out of %v correct\n", count, len(data))
+	fmt.Printf("Got %d out of %d correct\n", correct, len(quizs))
 }
 
-type secondsTimer struct {
-	timer *time.Timer
-	end time.Time
+func parseQuiz(qs [][]string) []quiz {
+	ret := make([]quiz, len(qs))
+
+	for i, q := range qs {
+		ret[i] = quiz {
+			q: q[0],
+			a: strings.TrimSpace(q[1]),
+		}
+	}
+	return ret
 }
 
-func newSecondsTimer(t time.Duration) *secondsTimer {
-	return &secondsTimer{time.NewTimer(t), time.Now().Add(t)}
+type quiz struct {
+	q string
+	a string
 }
 
-func (s *secondsTimer) timeRemaining() time.Duration {
-	return s.end.Sub(time.Now())
-}
-
-func (s *secondsTimer) stop() {
-	s.timer.Stop()
+func exit(msg string) {
+	fmt.Println(msg)
+	os.Exit(1)
 }
