@@ -1,0 +1,16 @@
+<html>
+    <head>
+        <title>CYOA</title>
+    </head>
+    <body>
+        <h1>{{.Title}}</h1>
+        {{range .Story}}
+            <p>{{.}}</p>
+        {{end}}
+
+        {{range .Options}}
+            <h2>{{.Text}}</h2>
+            <a href="/{{.Arc}}"> {{.Arc | pascalcase}}</a>
+        {{end}}
+    </body>
+</html>
