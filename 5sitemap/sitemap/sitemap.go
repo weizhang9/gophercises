@@ -27,20 +27,33 @@ func Parse(entryurl string) Sitemap {
 	var s Sitemap
 	s.Entry = entryurl
 	s.Domain = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-	fmt.Println(u.Path)
-	body, err := s.getEntryBody()
+	body, err := s.getBody(s.Entry)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	s.Links = s.getLinks(body)
-	if s.contains(s.Entry) {
+	if !s.contains(s.Entry) {
 		s.Links = append(s.Links, s.Entry)
 	}
+	for i := 0; i < 3; i++ {
+		s.scapeLinks(s.Links)
+	}
+
 	return s
 }
 
-func (s Sitemap) getEntryBody() (string, error) {
-	resp, err := http.Get(s.Entry)
+func (s *Sitemap) scapeLinks(urls []string) {
+	for _, u := range urls {
+		body, err := s.getBody(u)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		s.Links = s.getLinks(body)
+	}
+}
+
+func (s Sitemap) getBody(u string) (string, error) {
+	resp, err := http.Get(u)
 	if err != nil {
 		return "", err
 	}
@@ -52,7 +65,7 @@ func (s Sitemap) getEntryBody() (string, error) {
 	return string(body),  nil
 }
 
-func (s Sitemap) getLinks(body string) []string {
+func (s *Sitemap) getLinks(body string) []string {
 	node, err := html.Parse(strings.NewReader(body))
 	if err != nil {
 		log.Fatalln(err)
@@ -61,21 +74,30 @@ func (s Sitemap) getLinks(body string) []string {
 	// var links []string
 	for _, t := range atags {
 		href := getHref(t)
-		if s.selfURL(href) && !s.contains(href) {
-			s.Links = append(s.Links, href)
+		if s.internalURL(href) && !s.absoluteURL(href) {
+			// make sure all urls are absolute path
+			href = s.Domain + href
+			if !s.contains(href) {
+				s.Links = append(s.Links, href)
+			}
 		}
 	}
 	return s.Links
 }
 
-func (s Sitemap) selfURL(u string) bool {
+func (s Sitemap) internalURL(u string) bool {
 	if len(u) > 1 && strings.HasPrefix(u, "/") {
 		return true
 	}
-	if strings.HasPrefix(u, s.Domain) {
+	if s.absoluteURL(u) {
 		return true
 	}
 	return false
+}
+
+// absolute internal url
+func (s Sitemap) absoluteURL(u string) bool {
+	return strings.HasPrefix(u, s.Domain)
 }
 
 func getHref(n *html.Node) string {
@@ -102,32 +124,7 @@ func getATags(n *html.Node) []*html.Node {
 
 func (s Sitemap) contains(el string) bool {
 	for _, v := range s.Links {
-		// base is absolute url
-		if strings.HasPrefix(v, s.Domain) {
-			// el is absolute url with same domain
-			if strings.HasPrefix(el, s.Domain) && v == el {
-				return true
-			}
-
-			// el is relative url, strip base
-			u, _ := url.Parse(v)
-			if u.Path == el {
-				return true
-			}
-		}
-
-		// base and el are both relative urls
-		if !strings.HasPrefix(el, s.Domain) && v == el {
-			return true
-		}
-
-		u, err := url.Parse(el)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		// can't guarantee selfURL will be run first
-		// if it's an external url, throw it away
-		if fmt.Sprintf("%s://%s", u.Scheme, u.Host) == s.Domain && u.Path == v {
+		if v == el {
 			return true
 		}
 	}

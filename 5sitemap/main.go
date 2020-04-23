@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"sitemap/sitemap"
+	"sitemap/xml"
 )
 
 func main() {
@@ -17,6 +18,8 @@ func main() {
 	}
 
 	s := sitemap.Parse(*entry)
-	fmt.Printf("%#v",s)
+	res := xml.Marshal(s)
+
+	fmt.Println(string(res))
 }
 
