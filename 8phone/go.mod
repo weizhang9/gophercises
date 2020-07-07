@@ -1,4 +1,4 @@
-module gophercises
+module gophercises/phone-number-normaliser
 
 go 1.14
 
